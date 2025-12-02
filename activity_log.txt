@@ -4,3 +4,10 @@
 [2025-12-02 21:56:08] User:1(minh) | IP:127.0.0.1 | Action:LOGIN | Details:Successful login
 [2025-12-02 22:00:12] User:1(minh) | IP:127.0.0.1 | Action:CREATE_ROOM | Details:Created room 'mmm' (ID:14, Max:3)
 [2025-12-02 22:02:09] User:1(minh) | IP:127.0.0.1 | Action:DISCONNECT | Details:Disconnected and auto-left room 14
+[2025-12-02 22:15:07] User:1(minh) | IP:127.0.0.1 | Action:LOGIN | Details:Successful login
+[2025-12-02 22:15:13] User:5(trung) | IP:127.0.0.1 | Action:LOGIN | Details:Successful login
+[2025-12-02 22:15:17] User:3(mai) | IP:127.0.0.1 | Action:LOGIN | Details:Successful login
+[2025-12-02 22:16:13] User:0(SYSTEM) | IP:127.0.0.1 | Action:SEARCH | Details:Search: keyword='', results=14
+[2025-12-02 22:17:11] User:0(SYSTEM) | IP:127.0.0.1 | Action:SEARCH | Details:Search: keyword='', results=14
+[2025-12-02 22:19:04] User:0(SYSTEM) | IP:127.0.0.1 | Action:SEARCH | Details:Search: keyword='', results=14
+[2025-12-02 22:20:05] User:1(minh) | IP:127.0.0.1 | Action:LOGIN | Details:Successful login
