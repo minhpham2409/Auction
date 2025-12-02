@@ -23,6 +23,7 @@
 #define MAX_ROOMS 100
 #define MAX_AUCTIONS 1000
 #define MAX_BIDS 5000
+#define ACTIVITY_LOG_FILE "activity_log.txt"
 
 // =====================================================
 // DATA STRUCTURES
@@ -85,6 +86,16 @@ typedef struct {
     time_t login_time;
     int current_room_id; // User can only join one room at a time
 } ClientSession;
+
+// ✅ NEW: Activity Log structure
+typedef struct {
+    time_t timestamp;
+    int user_id;
+    char username[50];
+    char action[50]; // "login", "logout", "create_room", "join_room", "create_auction", "bid", "buy_now", "delete_auction"
+    char details[256];
+    char ip_address[50];
+} ActivityLog;
 
 // =====================================================
 // GLOBAL VARIABLES
@@ -196,6 +207,27 @@ void save_all_data() {
 }
 
 // =====================================================
+// ACTIVITY LOGGING
+// =====================================================
+
+void log_activity(int user_id, const char* username, const char* action, const char* details, const char* ip) {
+    FILE* f = fopen(ACTIVITY_LOG_FILE, "a");
+    if (f == NULL) {
+        printf("[WARNING] Could not open activity log file\n");
+        return;
+    }
+    
+    time_t now = time(NULL);
+    char time_str[64];
+    strftime(time_str, sizeof(time_str), "%Y-%m-%d %H:%M:%S", localtime(&now));
+    
+    fprintf(f, "[%s] User:%d(%s) | IP:%s | Action:%s | Details:%s\n",
+            time_str, user_id, username, ip, action, details);
+    
+    fclose(f);
+}
+
+// =====================================================
 // BUSINESS LOGIC FUNCTIONS
 // =====================================================
 
@@ -260,7 +292,7 @@ int create_room(int creator_id, const char *name, const char *desc, int max_part
 
     // Check for duplicate room name
     for (int i = 0; i < g_room_count; i++) {
-        if (strcmp(g_rooms[i].room_name, name) == 0 &&
+        if (strcmp(g_rooms[i].room_name, name) == 0 && 
             strcmp(g_rooms[i].status, "ended") != 0) {
             pthread_mutex_unlock(&data_mutex);
             return -2; // Room name already exists
@@ -293,7 +325,7 @@ int join_room(int user_id, int room_id) {
     pthread_mutex_lock(&data_mutex);
 
     AuctionRoom *room = find_room_by_id(room_id);
-
+    
     if (room == NULL) {
         pthread_mutex_unlock(&data_mutex);
         printf("[ERROR] join_room: Room %d not found\n", room_id);
@@ -308,7 +340,7 @@ int join_room(int user_id, int room_id) {
 
     if (room->current_participants >= room->max_participants) {
         pthread_mutex_unlock(&data_mutex);
-        printf("[ERROR] join_room: Room %d is full (%d/%d)\n",
+        printf("[ERROR] join_room: Room %d is full (%d/%d)\n", 
                room_id, room->current_participants, room->max_participants);
         return -3; // Room is full
     }
@@ -316,7 +348,7 @@ int join_room(int user_id, int room_id) {
     // Check if user already in a room - need client_mutex
     pthread_mutex_lock(&client_mutex);
     ClientSession *client = find_client_by_user_id(user_id);
-
+    
     if (client != NULL && client->current_room_id > 0 && client->current_room_id != room_id) {
         pthread_mutex_unlock(&client_mutex);
         pthread_mutex_unlock(&data_mutex);
@@ -332,11 +364,11 @@ int join_room(int user_id, int room_id) {
         printf("[WARNING] join_room: Client session not found for user %d\n", user_id);
     }
     pthread_mutex_unlock(&client_mutex);
-
+    
     room->current_participants++;
-    printf("[DEBUG] join_room: Room %d participants: %d/%d\n",
+    printf("[DEBUG] join_room: Room %d participants: %d/%d\n", 
            room_id, room->current_participants, room->max_participants);
-
+    
     // Activate room if it was waiting
     if (strcmp(room->status, "waiting") == 0) {
         strcpy(room->status, "active");
@@ -353,7 +385,7 @@ int join_room(int user_id, int room_id) {
 // Internal function - caller must hold BOTH data_mutex AND client_mutex!
 int _leave_room_unsafe(int user_id) {
     ClientSession *client = find_client_by_user_id(user_id);
-
+    
     if (client == NULL || client->current_room_id == 0) {
         printf("[DEBUG] _leave_room_unsafe: User %d not in any room\n", user_id);
         return -1; // Not in any room
@@ -363,7 +395,7 @@ int _leave_room_unsafe(int user_id) {
     AuctionRoom *room = find_room_by_id(old_room_id);
     if (room != NULL) {
         room->current_participants--;
-        printf("[DEBUG] _leave_room_unsafe: Room %d participants decreased to %d\n",
+        printf("[DEBUG] _leave_room_unsafe: Room %d participants decreased to %d\n", 
                old_room_id, room->current_participants);
     }
 
@@ -380,11 +412,11 @@ int leave_room(int user_id) {
     int result = _leave_room_unsafe(user_id);
 
     pthread_mutex_unlock(&client_mutex);
-
+    
     if (result == 0) {
         save_all_data();
     }
-
+    
     pthread_mutex_unlock(&data_mutex);
 
     return result;
@@ -480,7 +512,7 @@ int create_auction(int seller_id, int room_id, const char *title, const char *de
     ClientSession *client = find_client_by_user_id(seller_id);
     int seller_current_room = (client != NULL) ? client->current_room_id : 0;
     pthread_mutex_unlock(&client_mutex);
-
+    
     if (seller_current_room != room_id) {
         pthread_mutex_unlock(&data_mutex);
         return -3; // Seller not in room
@@ -539,7 +571,7 @@ int place_bid(int auction_id, int user_id, double bid_amount) {
     ClientSession *client = find_client_by_user_id(user_id);
     int user_room_id = (client != NULL) ? client->current_room_id : 0;
     pthread_mutex_unlock(&client_mutex);
-
+    
     if (user_room_id != auction->room_id) {
         pthread_mutex_unlock(&data_mutex);
         return -8; // Not in the same room
@@ -595,9 +627,9 @@ int place_bid(int auction_id, int user_id, double bid_amount) {
     }
 
     save_all_data();
-
+    
     int bid_id = bid->bid_id;
-
+    
     pthread_mutex_unlock(&data_mutex);
 
     return bid_id;
@@ -647,6 +679,47 @@ int buy_now(int auction_id, int user_id) {
     pthread_mutex_unlock(&data_mutex);
 
     return 0;
+}
+
+// ✅ NEW FEATURE: Delete auction (only if not started yet)
+int delete_auction(int auction_id, int user_id) {
+    pthread_mutex_lock(&data_mutex);
+
+    Auction *auction = find_auction_by_id(auction_id);
+
+    if (auction == NULL) {
+        pthread_mutex_unlock(&data_mutex);
+        return -1; // Auction not found
+    }
+
+    // Can only delete if status is "waiting" (not started yet)
+    if (strcmp(auction->status, "waiting") != 0) {
+        pthread_mutex_unlock(&data_mutex);
+        return -2; // Auction already started or ended
+    }
+
+    // Get room to check permissions
+    AuctionRoom *room = find_room_by_id(auction->room_id);
+    if (room == NULL) {
+        pthread_mutex_unlock(&data_mutex);
+        return -3; // Room not found
+    }
+
+    // Only seller or room creator can delete
+    if (auction->seller_id != user_id && room->created_by != user_id) {
+        pthread_mutex_unlock(&data_mutex);
+        return -4; // No permission
+    }
+
+    // Mark auction as deleted
+    strcpy(auction->status, "deleted");
+    room->total_auctions--;
+
+    save_all_data();
+    pthread_mutex_unlock(&data_mutex);
+
+    printf("[INFO] Auction %d deleted by user %d\n", auction_id, user_id);
+    return 0; // Success
 }
 
 // =====================================================
@@ -710,12 +783,12 @@ void remove_client(int socket) {
 
     int user_id_to_remove = 0;
     int room_id_to_leave = 0;
-
+    
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (g_clients[i].is_active && g_clients[i].socket == socket) {
             user_id_to_remove = g_clients[i].user_id;
             room_id_to_leave = g_clients[i].current_room_id;
-
+            
             g_clients[i].is_active = 0;
             g_client_count--;
             printf("[INFO] Client disconnected: socket=%d, user_id=%d\n", socket, user_id_to_remove);
@@ -724,19 +797,27 @@ void remove_client(int socket) {
     }
 
     pthread_mutex_unlock(&client_mutex);
-
+    
     // Auto leave room when disconnect
     if (user_id_to_remove > 0 && room_id_to_leave > 0) {
         pthread_mutex_lock(&data_mutex);
         pthread_mutex_lock(&client_mutex);
-
+        
         _leave_room_unsafe(user_id_to_remove);
         save_all_data();
-
+        
         pthread_mutex_unlock(&client_mutex);
         pthread_mutex_unlock(&data_mutex);
-
+        
         printf("[INFO] User %d auto-left room %d on disconnect\n", user_id_to_remove, room_id_to_leave);
+        
+        // ✅ Log disconnect and auto-leave
+        User *user = find_user_by_id(user_id_to_remove);
+        if (user != NULL) {
+            char details[256];
+            sprintf(details, "Disconnected and auto-left room %d", room_id_to_leave);
+            log_activity(user_id_to_remove, user->username, "DISCONNECT", details, "127.0.0.1");
+        }
     }
 }
 
@@ -744,8 +825,8 @@ void broadcast_message_to_room(const char *message, int room_id, int exclude_soc
     pthread_mutex_lock(&client_mutex);
 
     for (int i = 0; i < MAX_CLIENTS; i++) {
-        if (g_clients[i].is_active &&
-            g_clients[i].current_room_id == room_id &&
+        if (g_clients[i].is_active && 
+            g_clients[i].current_room_id == room_id && 
             g_clients[i].socket != exclude_socket) {
             send(g_clients[i].socket, message, strlen(message), 0);
         }
@@ -795,12 +876,21 @@ void handle_login(int client_socket, char *data) {
                 user_id, username, user->balance);
         add_client(client_socket, user_id, username);
         printf("[INFO] User %s logged in (socket %d)\n", username, client_socket);
+        
+        // ✅ Log activity
+        log_activity(user_id, username, "LOGIN", "Successful login", "127.0.0.1");
     } else if (user_id == -1) {
         sprintf(response, "LOGIN_FAIL|User not found\n");
+        // ✅ Log failed attempt
+        log_activity(0, username, "LOGIN_FAIL", "User not found", "127.0.0.1");
     } else if (user_id == -2) {
         sprintf(response, "LOGIN_FAIL|Wrong password\n");
+        // ✅ Log failed attempt
+        log_activity(0, username, "LOGIN_FAIL", "Wrong password", "127.0.0.1");
     } else {
         sprintf(response, "LOGIN_FAIL|Account not active\n");
+        // ✅ Log failed attempt
+        log_activity(0, username, "LOGIN_FAIL", "Account not active", "127.0.0.1");
     }
 
     send(client_socket, response, strlen(response), 0);
@@ -813,29 +903,53 @@ void handle_create_room(int client_socket, char *data) {
     sscanf(data, "%d|%[^|]|%[^|]|%d|%d",
            &creator_id, name, desc, &max_participants, &duration);
 
-    int room_id = create_room(creator_id, name, desc, max_participants, duration);
+    // ✅ NEW: Check if user is already in a room
+    pthread_mutex_lock(&client_mutex);
+    ClientSession *creator_session = find_client_by_user_id(creator_id);
+    int current_room = (creator_session != NULL) ? creator_session->current_room_id : 0;
+    pthread_mutex_unlock(&client_mutex);
 
     char response[BUFFER_SIZE];
+    
+    if (current_room > 0) {
+        // User is already in a room, cannot create new room
+        sprintf(response, "CREATE_ROOM_FAIL|You must leave your current room before creating a new one\n");
+        send(client_socket, response, strlen(response), 0);
+        printf("[INFO] User %d tried to create room while in room %d - blocked\n", 
+               creator_id, current_room);
+        return;
+    }
+
+    int room_id = create_room(creator_id, name, desc, max_participants, duration);
+
     if (room_id > 0) {
         // Auto-join creator to the room
         int join_result = join_room(creator_id, room_id);
-
+        
         if (join_result == 0) {
             sprintf(response, "CREATE_ROOM_SUCCESS|%d|%s\n", room_id, name);
-            printf("[INFO] Room created: ID=%d, Name=%s, by User=%d (auto-joined)\n",
+            printf("[INFO] Room created: ID=%d, Name=%s, by User=%d (auto-joined)\n", 
                    room_id, name, creator_id);
+            
+            // ✅ Log room creation
+            User *creator = find_user_by_id(creator_id);
+            if (creator != NULL) {
+                char details[256];
+                sprintf(details, "Created room '%s' (ID:%d, Max:%d)", name, room_id, max_participants);
+                log_activity(creator_id, creator->username, "CREATE_ROOM", details, "127.0.0.1");
+            }
         } else {
             sprintf(response, "CREATE_ROOM_SUCCESS|%d|%s\n", room_id, name);
-            printf("[INFO] Room created: ID=%d, Name=%s, by User=%d (join failed: %d)\n",
+            printf("[INFO] Room created: ID=%d, Name=%s, by User=%d (join failed: %d)\n", 
                    room_id, name, creator_id, join_result);
         }
-
+        
         // Broadcast NEW_ROOM notification to all logged-in users
         char notification[512];
         User *creator = find_user_by_id(creator_id);
-        sprintf(notification, "NEW_ROOM|%d|%s|%s|%d\n",
+        sprintf(notification, "NEW_ROOM|%d|%s|%s|%d\n", 
                 room_id, name, creator ? creator->username : "Unknown", max_participants);
-
+        
         // Broadcast to all active clients EXCEPT creator (already knows)
         pthread_mutex_lock(&client_mutex);
         for (int i = 0; i < MAX_CLIENTS; i++) {
@@ -844,7 +958,7 @@ void handle_create_room(int client_socket, char *data) {
             }
         }
         pthread_mutex_unlock(&client_mutex);
-
+        
     } else if (room_id == -2) {
         sprintf(response, "CREATE_ROOM_FAIL|Room name already exists\n");
     } else {
@@ -901,13 +1015,18 @@ void handle_join_room(int client_socket, char *data) {
         if (room != NULL) {
             sprintf(response, "JOIN_ROOM_SUCCESS|%d|%s\n", room_id, room->room_name);
             printf("[INFO] User %d joined room %d (%s)\n", user_id, room_id, room->room_name);
-
+            
             // Broadcast to room
             User *user = find_user_by_id(user_id);
             if (user != NULL) {
                 char notification[256];
                 sprintf(notification, "USER_JOINED|%s|%d\n", user->username, room_id);
                 broadcast_message_to_room(notification, room_id, client_socket);
+                
+                // ✅ Log join room
+                char details[256];
+                sprintf(details, "Joined room '%s' (ID:%d)", room->room_name, room_id);
+                log_activity(user_id, user->username, "JOIN_ROOM", details, "127.0.0.1");
             }
         } else {
             sprintf(response, "JOIN_ROOM_FAIL|Room not found after join\n");
@@ -943,7 +1062,7 @@ void handle_leave_room(int client_socket, char *data) {
     if (result == 0) {
         sprintf(response, "LEAVE_ROOM_SUCCESS|\n");
         printf("[INFO] User %d left room %d\n", user_id, old_room_id);
-
+        
         // Broadcast to room
         if (old_room_id > 0) {
             User *user = find_user_by_id(user_id);
@@ -1006,7 +1125,7 @@ void handle_my_room(int client_socket, char *data) {
     if (client != NULL && client->current_room_id > 0) {
         pthread_mutex_lock(&data_mutex);
         AuctionRoom *room = find_room_by_id(client->current_room_id);
-
+        
         if (room != NULL) {
             sprintf(response, "MY_ROOM|%d|%s|%d|%d\n",
                     room->room_id,
@@ -1016,7 +1135,7 @@ void handle_my_room(int client_socket, char *data) {
         } else {
             sprintf(response, "MY_ROOM|0|Not in any room|0|0\n");
         }
-
+        
         pthread_mutex_unlock(&data_mutex);
     } else {
         sprintf(response, "MY_ROOM|0|Not in any room|0|0\n");
@@ -1077,7 +1196,7 @@ void handle_auction_detail(int client_socket, char *data) {
 
     // Validate user is in the same room
     ClientSession *client = find_client_by_user_id(user_id);
-
+    
     pthread_mutex_lock(&data_mutex);
 
     Auction *auction = find_auction_by_id(auction_id);
@@ -1136,6 +1255,14 @@ void handle_create_auction(int client_socket, char *data) {
     if (auction_id > 0) {
         sprintf(response, "CREATE_AUCTION_SUCCESS|%d|%s\n", auction_id, title);
 
+        // ✅ Log auction creation
+        User *seller = find_user_by_id(user_id);
+        if (seller != NULL) {
+            char details[256];
+            sprintf(details, "Created auction '%s' (ID:%d, Price:%.2f)", title, auction_id, start_price);
+            log_activity(user_id, seller->username, "CREATE_AUCTION", details, "127.0.0.1");
+        }
+
         // Broadcast to room
         Auction *new_auction = find_auction_by_id(auction_id);
         if (new_auction != NULL) {
@@ -1176,26 +1303,35 @@ void handle_place_bid(int client_socket, char *data) {
         int time_left = auction ? (auction->end_time - time(NULL)) : 0;
         int total_bids = auction ? auction->total_bids : 0;
         pthread_mutex_unlock(&data_mutex);
-
-        sprintf(response, "BID_SUCCESS|%d|%.2f|%d|%d\n",
+        
+        sprintf(response, "BID_SUCCESS|%d|%.2f|%d|%d\n", 
                 auction_id, bid_amount, total_bids, time_left);
+
+        // ✅ Log bid placement
+        User *bidder = find_user_by_id(user_id);
+        if (bidder != NULL) {
+            char details[256];
+            sprintf(details, "Bid on auction %d: %.2f VND (Total bids: %d)", 
+                    auction_id, bid_amount, total_bids);
+            log_activity(user_id, bidder->username, "PLACE_BID", details, "127.0.0.1");
+        }
 
         // Broadcast to room with extended info
         if (auction != NULL) {
             User *bidder = find_user_by_id(user_id);
             char notification[512];
-
+            
             if (time_left < 30 && time_left > 0) {
                 // Warning + bid notification
                 sprintf(notification, "NEW_BID_WARNING|%d|%s|%.2f|%d|%d\n",
-                        auction_id, bidder ? bidder->username : "Unknown",
+                        auction_id, bidder ? bidder->username : "Unknown", 
                         bid_amount, total_bids, time_left);
             } else {
                 sprintf(notification, "NEW_BID|%d|%s|%.2f|%d\n",
-                        auction_id, bidder ? bidder->username : "Unknown",
+                        auction_id, bidder ? bidder->username : "Unknown", 
                         bid_amount, total_bids);
             }
-
+            
             broadcast_message_to_room(notification, auction->room_id, client_socket);
         }
     } else {
@@ -1226,8 +1362,19 @@ void handle_buy_now(int client_socket, char *data) {
     if (result == 0) {
         sprintf(response, "BUY_NOW_SUCCESS|%d\n", auction_id);
 
-        // Broadcast to room
+        // Get auction for logging and broadcast
         Auction *auction = find_auction_by_id(auction_id);
+
+        // ✅ Log buy now
+        User *buyer = find_user_by_id(user_id);
+        if (buyer != NULL && auction != NULL) {
+            char details[256];
+            sprintf(details, "Bought auction %d instantly: %.2f VND", 
+                    auction_id, auction->buy_now_price);
+            log_activity(user_id, buyer->username, "BUY_NOW", details, "127.0.0.1");
+        }
+
+        // Broadcast to room
         if (auction != NULL) {
             char notification[512];
             sprintf(notification, "AUCTION_ENDED|%d|buy_now\n", auction_id);
@@ -1248,17 +1395,59 @@ void handle_buy_now(int client_socket, char *data) {
     send(client_socket, response, strlen(response), 0);
 }
 
+// ✅ NEW: Handle delete auction request
+void handle_delete_auction(int client_socket, char *data) {
+    int auction_id, user_id;
+    sscanf(data, "%d|%d", &auction_id, &user_id);
+
+    int result = delete_auction(auction_id, user_id);
+
+    char response[BUFFER_SIZE];
+    if (result == 0) {
+        sprintf(response, "DELETE_AUCTION_SUCCESS|%d\n", auction_id);
+        printf("[INFO] Auction %d deleted successfully by user %d\n", auction_id, user_id);
+        
+        // ✅ Log auction deletion
+        User *deleter = find_user_by_id(user_id);
+        if (deleter != NULL) {
+            char details[256];
+            sprintf(details, "Deleted auction %d", auction_id);
+            log_activity(user_id, deleter->username, "DELETE_AUCTION", details, "127.0.0.1");
+        }
+        
+        // Broadcast to room that auction was deleted
+        Auction *auction = find_auction_by_id(auction_id);
+        if (auction != NULL) {
+            char notification[256];
+            sprintf(notification, "AUCTION_DELETED|%d\n", auction_id);
+            broadcast_message_to_room(notification, auction->room_id, client_socket);
+        }
+    } else {
+        const char *error_msg;
+        switch(result) {
+            case -1: error_msg = "Auction not found"; break;
+            case -2: error_msg = "Cannot delete - auction already started or ended"; break;
+            case -3: error_msg = "Room not found"; break;
+            case -4: error_msg = "No permission - only seller or room creator can delete"; break;
+            default: error_msg = "Unknown error"; break;
+        }
+        sprintf(response, "DELETE_AUCTION_FAIL|%s\n", error_msg);
+    }
+
+    send(client_socket, response, strlen(response), 0);
+}
+
 void handle_bid_history(int client_socket, char *data) {
     int auction_id, user_id;
     sscanf(data, "%d|%d", &auction_id, &user_id);
 
     // Validate room access
     ClientSession *client = find_client_by_user_id(user_id);
-
+    
     pthread_mutex_lock(&data_mutex);
 
     Auction *auction = find_auction_by_id(auction_id);
-
+    
     if (auction == NULL || client == NULL || client->current_room_id != auction->room_id) {
         char response[] = "BID_HISTORY_FAIL|Not in the same room\n";
         send(client_socket, response, strlen(response), 0);
@@ -1339,16 +1528,16 @@ void handle_auction_history(int client_socket, char *data) {
             char auction_info[512];
             char winner_name[50] = "No winner";
             char win_method[20] = "no_bids";
-
+            
             if (g_auctions[i].winner_id > 0) {
                 User *winner = find_user_by_id(g_auctions[i].winner_id);
                 if (winner != NULL) {
                     strncpy(winner_name, winner->username, 49);
                     winner_name[49] = '\0';
                 }
-
+                
                 // Determine win method
-                if (g_auctions[i].current_price == g_auctions[i].buy_now_price
+                if (g_auctions[i].current_price == g_auctions[i].buy_now_price 
                     && g_auctions[i].buy_now_price > 0) {
                     strcpy(win_method, "buy_now");
                 } else {
@@ -1443,6 +1632,8 @@ void* handle_client(void *arg) {
             handle_place_bid(client_socket, data);
         } else if (strcmp(command, "BUY_NOW") == 0) {
             handle_buy_now(client_socket, data);
+        } else if (strcmp(command, "DELETE_AUCTION") == 0) {
+            handle_delete_auction(client_socket, data);
         } else if (strcmp(command, "BID_HISTORY") == 0) {
             handle_bid_history(client_socket, data);
         } else if (strcmp(command, "AUCTION_HISTORY") == 0) {
@@ -1477,7 +1668,7 @@ void* auction_timer(void *arg) {
         for (int i = 0; i < g_auction_count; i++) {
             if (strcmp(g_auctions[i].status, "active") == 0) {
                 int time_left = g_auctions[i].end_time - now;
-
+                
                 // Check if auction ended
                 if (time_left <= 0) {
                     strcpy(g_auctions[i].status, "ended");
@@ -1486,7 +1677,7 @@ void* auction_timer(void *arg) {
                     char winner_name[50] = "No bids";
                     double final_price = g_auctions[i].current_price;
                     int total_bids = g_auctions[i].total_bids;
-
+                    
                     if (g_auctions[i].winner_id > 0) {
                         User *winner = find_user_by_id(g_auctions[i].winner_id);
                         if (winner != NULL) {
@@ -1504,7 +1695,7 @@ void* auction_timer(void *arg) {
                             total_bids);
                     broadcast_message_to_room(notification, g_auctions[i].room_id, -1);
 
-                    printf("[INFO] Auction %d ended - Winner: %s, Price: %.2f, Bids: %d\n",
+                    printf("[INFO] Auction %d ended - Winner: %s, Price: %.2f, Bids: %d\n", 
                            g_auctions[i].auction_id, winner_name, final_price, total_bids);
                 }
                 // ✅ NEW: Send warning when 30 seconds left
@@ -1517,8 +1708,8 @@ void* auction_timer(void *arg) {
                             g_auctions[i].current_price,
                             time_left);
                     broadcast_message_to_room(warning, g_auctions[i].room_id, -1);
-
-                    printf("[INFO] Auction %d warning: %d seconds left\n",
+                    
+                    printf("[INFO] Auction %d warning: %d seconds left\n", 
                            g_auctions[i].auction_id, time_left);
                 }
             }

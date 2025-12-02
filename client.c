@@ -76,15 +76,15 @@ int send_request(const char *request) {
 
 int receive_response(char *buffer, int size) {
     memset(buffer, 0, size);
-
+    
     // Set timeout for recv
     struct timeval tv;
     tv.tv_sec = 10;  // 10 second timeout
     tv.tv_usec = 0;
     setsockopt(client_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-
+    
     int bytes = recv(client_socket, buffer, size - 1, 0);
-
+    
     if (bytes > 0) {
         buffer[bytes] = '\0';
     } else if (bytes == 0) {
@@ -101,7 +101,7 @@ int receive_response(char *buffer, int size) {
         }
         bytes = -1;
     }
-
+    
     return bytes;
 }
 
@@ -176,9 +176,9 @@ void* notification_listener(void *arg) {
             if (strncmp(buffer, "NEW_ROOM|", 9) == 0) {
                 int room_id, max_participants;
                 char room_name[100], creator[50];
-                sscanf(buffer + 9, "%d|%[^|]|%[^|]|%d",
+                sscanf(buffer + 9, "%d|%[^|]|%[^|]|%d", 
                        &room_id, room_name, creator, &max_participants);
-
+                
                 safe_print("\n╔════════════════════════════════════════════════════════╗\n");
                 safe_print("║          🏠 NEW ROOM CREATED! 🏠                      ║\n");
                 safe_print("╠════════════════════════════════════════════════════════╣\n");
@@ -193,7 +193,7 @@ void* notification_listener(void *arg) {
                 char username[50];
                 int room_id;
                 sscanf(buffer + 12, "%[^|]|%d", username, &room_id);
-
+                
                 safe_print("\n╔════════════════════════════════════════════════════════╗\n");
                 safe_print("║          👤 USER JOINED ROOM 👤                       ║\n");
                 safe_print("╠════════════════════════════════════════════════════════╣\n");
@@ -201,12 +201,12 @@ void* notification_listener(void *arg) {
                 safe_print("║ Room ID: %-5d                                        ║\n", room_id);
                 safe_print("╚════════════════════════════════════════════════════════╝\n");
                 safe_print(">> ");
-            }
+            } 
             else if (strncmp(buffer, "USER_LEFT|", 10) == 0) {
                 char username[50];
                 int room_id;
                 sscanf(buffer + 10, "%[^|]|%d", username, &room_id);
-
+                
                 safe_print("\n╔════════════════════════════════════════════════════════╗\n");
                 safe_print("║          👋 USER LEFT ROOM 👋                         ║\n");
                 safe_print("╠════════════════════════════════════════════════════════╣\n");
@@ -243,7 +243,7 @@ void* notification_listener(void *arg) {
                 int auction_id, total_bids, time_left;
                 char bidder[50];
                 double bid_amount;
-                sscanf(buffer + 16, "%d|%[^|]|%lf|%d|%d",
+                sscanf(buffer + 16, "%d|%[^|]|%lf|%d|%d", 
                        &auction_id, bidder, &bid_amount, &total_bids, &time_left);
 
                 safe_print("\n╔════════════════════════════════════════════════════════╗\n");
@@ -263,7 +263,7 @@ void* notification_listener(void *arg) {
                 int auction_id, total_bids;
                 char bidder[50];
                 double bid_amount;
-                sscanf(buffer + 8, "%d|%[^|]|%lf|%d",
+                sscanf(buffer + 8, "%d|%[^|]|%lf|%d", 
                        &auction_id, bidder, &bid_amount, &total_bids);
 
                 safe_print("\n╔════════════════════════════════════════════════════════╗\n");
@@ -280,7 +280,7 @@ void* notification_listener(void *arg) {
                 int auction_id, time_left;
                 char title[200];
                 double current_price;
-                sscanf(buffer + 16, "%d|%[^|]|%lf|%d",
+                sscanf(buffer + 16, "%d|%[^|]|%lf|%d", 
                        &auction_id, title, &current_price, &time_left);
 
                 safe_print("\n");
@@ -303,11 +303,11 @@ void* notification_listener(void *arg) {
                 int auction_id, total_bids;
                 char title[200], winner_name[50];
                 double final_price;
-
+                
                 // Parse: AUCTION_ENDED|auction_id|title|winner|price|total_bids
-                if (sscanf(buffer + 14, "%d|%[^|]|%[^|]|%lf|%d",
+                if (sscanf(buffer + 14, "%d|%[^|]|%[^|]|%lf|%d", 
                            &auction_id, title, winner_name, &final_price, &total_bids) == 5) {
-
+                    
                     safe_print("\n");
                     safe_print("╔════════════════════════════════════════════════════════╗\n");
                     safe_print("║                                                        ║\n");
@@ -317,7 +317,7 @@ void* notification_listener(void *arg) {
                     safe_print("║ Auction ID:      #%-5d                              ║\n", auction_id);
                     safe_print("║ Title:           %-38s   ║\n", title);
                     safe_print("╠════════════════════════════════════════════════════════╣\n");
-
+                    
                     if (strcmp(winner_name, "No bids") == 0) {
                         safe_print("║                                                        ║\n");
                         safe_print("║          ❌ NO WINNER - NO BIDS PLACED ❌            ║\n");
@@ -338,7 +338,7 @@ void* notification_listener(void *arg) {
                         safe_print("║ Final Price:     %12.2f VND                   ║\n", final_price);
                         safe_print("║ Total Bids:      %-5d                                ║\n", total_bids);
                     }
-
+                    
                     safe_print("╚════════════════════════════════════════════════════════╝\n");
                 } else {
                     // Fallback for old format
@@ -382,15 +382,17 @@ void display_user_menu() {
     print_separator();
     printf("AUCTION MANAGEMENT:\n");
     printf("7. List Auctions (in current room)\n");
-    printf("8. View My Auctions\n");
-    printf("9. View Auction Detail\n");
-    printf("10. Create New Auction\n");
-    printf("11. Place Bid\n");
-    printf("12. Buy Now\n");
-    printf("13. View Bid History\n");
-    printf("14. View Auction History (Completed)\n");
+    printf("8. View Live Auctions (Countdown Timer)\n");
+    printf("9. View My Auctions\n");
+    printf("10. View Auction Detail\n");
+    printf("11. Create New Auction\n");
+    printf("12. Delete Auction\n");
+    printf("13. Place Bid\n");
+    printf("14. Buy Now\n");
+    printf("15. View Bid History\n");
+    printf("16. View Auction History (Completed)\n");
     print_separator();
-    printf("15. Logout\n");
+    printf("17. Logout\n");
     print_separator();
     printf("Choose option: ");
 }
@@ -429,7 +431,7 @@ void create_room() {
 
     char response[BUFFER_SIZE];
     int bytes = receive_response(response, BUFFER_SIZE);
-
+    
     if (bytes <= 0) {
         printf("\n[ERROR] Connection lost!\n");
         printf("\nPress Enter to continue...");
@@ -533,9 +535,9 @@ void join_room() {
 
     char request[256];
     sprintf(request, "JOIN_ROOM|%d|%d\n", current_user_id, room_id);
-
+    
     printf("[DEBUG] Sending: %s", request);
-
+    
     if (send_request(request) <= 0) {
         printf("[ERROR] Failed to send request!\n");
         printf("\nPress Enter to continue...");
@@ -548,7 +550,7 @@ void join_room() {
 
     char response[BUFFER_SIZE];
     int bytes = receive_response(response, BUFFER_SIZE);
-
+    
     if (bytes <= 0) {
         printf("\n[ERROR] Connection lost or timeout!\n");
         printf("\nPress Enter to continue...");
@@ -603,7 +605,7 @@ void leave_room() {
 
     printf("Current Room: %s (ID: %d)\n", current_room_name, current_room_id);
     printf("Are you sure you want to leave? (y/n): ");
-
+    
     char confirm;
     scanf(" %c", &confirm);
 
@@ -658,7 +660,7 @@ void view_room_detail() {
 
     char response[BUFFER_SIZE];
     int bytes = receive_response(response, BUFFER_SIZE);
-
+    
     if (bytes <= 0) {
         printf("\n[ERROR] Connection lost!\n");
         printf("\nPress Enter to continue...");
@@ -729,7 +731,7 @@ void view_my_room() {
             printf("Room Name        : %s\n", room_name);
             printf("Participants     : %d\n", participants);
             printf("Total Auctions   : %d\n", auctions);
-
+            
             // Update local variables
             current_room_id = room_id;
             strcpy(current_room_name, room_name);
@@ -811,7 +813,7 @@ void login_user() {
     sprintf(request, "LOGIN|%s %s\n", username, password);
 
     printf("\n[INFO] Sending login request...\n");
-
+    
     if (send_request(request) <= 0) {
         printf("[ERROR] Failed to send request!\n");
         printf("\nPress Enter to continue...");
@@ -824,7 +826,7 @@ void login_user() {
 
     char response[BUFFER_SIZE];
     int bytes = receive_response(response, BUFFER_SIZE);
-
+    
     if (bytes <= 0) {
         printf("[ERROR] No response from server!\n");
         printf("\nPress Enter to continue...");
@@ -875,6 +877,109 @@ void login_user() {
 // =====================================================
 // AUCTION FEATURE FUNCTIONS
 // =====================================================
+
+// ✅ NEW FEATURE: Live Countdown Timer
+void view_live_auctions() {
+    print_header("LIVE AUCTIONS - COUNTDOWN VIEW");
+
+    if (current_room_id == 0) {
+        printf("\n[ERROR] You must join a room first!\n");
+        printf("\nPress Enter to continue...");
+        getchar();
+        getchar();
+        return;
+    }
+
+    printf("\n🔴 LIVE VIEW - Press Ctrl+C to exit\n\n");
+    
+    // Store auction data
+    typedef struct {
+        int id;
+        char title[200];
+        double current_price;
+        double buy_now_price;
+        int time_left;
+        int total_bids;
+    } AuctionDisplay;
+    
+    AuctionDisplay auctions[100];
+    int auction_count = 0;
+
+    while (1) {
+        // Fetch fresh data
+        char request[256];
+        sprintf(request, "LIST_AUCTIONS|%d\n", current_user_id);
+        send_request(request);
+
+        char response[BUFFER_SIZE * 4];
+        int bytes = receive_response(response, BUFFER_SIZE * 4);
+        
+        if (bytes <= 0) break;
+
+        auction_count = 0;
+        if (strncmp(response, "AUCTION_LIST|", 13) == 0) {
+            char *data = response + 13;
+            char *token = strtok(data, "|");
+
+            while (token != NULL && auction_count < 100) {
+                if (sscanf(token, "%d;%[^;];%lf;%lf;%d;%d",
+                          &auctions[auction_count].id,
+                          auctions[auction_count].title,
+                          &auctions[auction_count].current_price,
+                          &auctions[auction_count].buy_now_price,
+                          &auctions[auction_count].time_left,
+                          &auctions[auction_count].total_bids) == 6) {
+                    auction_count++;
+                }
+                token = strtok(NULL, "|");
+            }
+        }
+
+        // Clear screen and display
+        printf("\033[2J\033[H"); // Clear screen
+        printf("╔════════════════════════════════════════════════════════╗\n");
+        printf("║          🔴 LIVE AUCTIONS - COUNTDOWN VIEW 🔴         ║\n");
+        printf("╚════════════════════════════════════════════════════════╝\n\n");
+
+        if (auction_count == 0) {
+            printf("No active auctions in this room.\n");
+            sleep(2);
+            break;
+        }
+
+        for (int i = 0; i < auction_count; i++) {
+            int hours = auctions[i].time_left / 3600;
+            int minutes = (auctions[i].time_left % 3600) / 60;
+            int seconds = auctions[i].time_left % 60;
+            
+            printf("┌────────────────────────────────────────────────────────┐\n");
+            printf("│ #%-3d %-48s │\n", auctions[i].id, auctions[i].title);
+            printf("├────────────────────────────────────────────────────────┤\n");
+            printf("│ Price: %12.2f VND | Bids: %-3d                 │\n",
+                   auctions[i].current_price, auctions[i].total_bids);
+            
+            // Color-coded countdown
+            if (auctions[i].time_left <= 30) {
+                printf("│ ⚠️  TIME: %02d:%02d:%02d ⚠️  ENDING SOON!                  │\n",
+                       hours, minutes, seconds);
+            } else if (auctions[i].time_left <= 300) {
+                printf("│ ⏰ TIME: %02d:%02d:%02d - HURRY UP!                       │\n",
+                       hours, minutes, seconds);
+            } else {
+                printf("│ ⏱️  TIME: %02d:%02d:%02d                                   │\n",
+                       hours, minutes, seconds);
+            }
+            printf("└────────────────────────────────────────────────────────┘\n\n");
+        }
+
+        printf("Press Ctrl+C to return to menu...\n");
+        
+        sleep(3); // Update every 3 seconds
+    }
+
+    printf("\nPress Enter to continue...");
+    getchar();
+}
 
 void list_auctions() {
     print_header("ACTIVE AUCTIONS (IN CURRENT ROOM)");
@@ -1080,7 +1185,7 @@ void create_auction() {
 
     char request[BUFFER_SIZE];
     sprintf(request, "CREATE_AUCTION|%d|%d|%s|%s|%.2f|%.2f|%.2f|%d\n",
-            current_user_id, current_room_id, title, desc, start_price,
+            current_user_id, current_room_id, title, desc, start_price, 
             buy_now_price, min_increment, duration_minutes);
 
     send_request(request);
@@ -1142,7 +1247,7 @@ void place_bid() {
     if (strncmp(response, "BID_SUCCESS", 11) == 0) {
         int aid, total_bids, time_left;
         double amount;
-        sscanf(response, "BID_SUCCESS|%d|%lf|%d|%d",
+        sscanf(response, "BID_SUCCESS|%d|%lf|%d|%d", 
                &aid, &amount, &total_bids, &time_left);
 
         printf("\n╔════════════════════════════════════════════════════════╗\n");
@@ -1151,14 +1256,14 @@ void place_bid() {
         printf("║ Auction ID:      #%-5d                              ║\n", aid);
         printf("║ Your Bid:        %12.2f VND                   ║\n", amount);
         printf("║ Your Rank:       #%-3d (Current Winner!)               ║\n", total_bids);
-
+        
         if (time_left < 30 && time_left > 0) {
             printf("║ ⚠️  WARNING:      Only %2d seconds left!              ║\n", time_left);
             printf("║ Time extended to 30 seconds!                           ║\n");
         } else {
             printf("║ Time Left:       %3d minutes                           ║\n", time_left / 60);
         }
-
+        
         printf("╚════════════════════════════════════════════════════════╝\n");
 
         current_balance -= amount;
@@ -1221,6 +1326,118 @@ void buy_now() {
         char error[256];
         sscanf(response, "BUY_NOW_FAIL|%[^\n]", error);
         printf("\n[ERROR] Purchase failed: %s\n", error);
+    }
+
+    printf("\nPress Enter to continue...");
+    getchar();
+    getchar();
+}
+
+// ✅ NEW FEATURE: Delete auction
+void delete_auction() {
+    print_header("DELETE AUCTION");
+
+    // First show user's auctions that can be deleted (status = "waiting")
+    printf("Your auctions that can be deleted (not started yet):\n\n");
+    
+    char request[256];
+    sprintf(request, "MY_AUCTIONS|%d\n", current_user_id);
+    send_request(request);
+
+    char response[BUFFER_SIZE * 4];
+    receive_response(response, BUFFER_SIZE * 4);
+
+    int deletable_count = 0;
+    if (strncmp(response, "MY_AUCTIONS|", 12) == 0) {
+        char *data = response + 12;
+        char *token = strtok(data, "|");
+
+        printf("%-5s %-30s %-15s %-10s\n", "ID", "Title", "Current Price", "Status");
+        print_separator();
+
+        while (token != NULL) {
+            int id, time_left, total_bids;
+            char title[200], status[20];
+            double current_price, buy_now_price;
+
+            if (sscanf(token, "%d;%[^;];%lf;%lf;%d;%[^;];%d",
+                      &id, title, &current_price, &buy_now_price,
+                      &time_left, status, &total_bids) == 7) {
+
+                // Only show "waiting" status auctions
+                if (strcmp(status, "waiting") == 0) {
+                    printf("%-5d %-30s %12.2f VND %-10s\n",
+                           id, title, current_price, status);
+                    deletable_count++;
+                }
+            }
+
+            token = strtok(NULL, "|");
+        }
+    }
+
+    if (deletable_count == 0) {
+        printf("\nYou have no auctions that can be deleted.\n");
+        printf("(Only auctions that haven't started can be deleted)\n");
+        printf("\nPress Enter to continue...");
+        getchar();
+        getchar();
+        return;
+    }
+
+    printf("\n");
+    int auction_id;
+    printf("Enter Auction ID to delete (0 to cancel): ");
+    if (scanf("%d", &auction_id) != 1) {
+        printf("\n[ERROR] Invalid input!\n");
+        while (getchar() != '\n');
+        printf("\nPress Enter to continue...");
+        getchar();
+        return;
+    }
+
+    if (auction_id == 0) {
+        printf("Delete cancelled.\n");
+        printf("\nPress Enter to continue...");
+        getchar();
+        getchar();
+        return;
+    }
+
+    printf("\n⚠️  Are you sure you want to DELETE auction #%d? (y/n): ", auction_id);
+    char confirm;
+    scanf(" %c", &confirm);
+
+    if (confirm != 'y' && confirm != 'Y') {
+        printf("Delete cancelled.\n");
+        printf("\nPress Enter to continue...");
+        getchar();
+        getchar();
+        return;
+    }
+
+    sprintf(request, "DELETE_AUCTION|%d|%d\n", auction_id, current_user_id);
+    send_request(request);
+
+    receive_response(response, BUFFER_SIZE);
+
+    if (strncmp(response, "DELETE_AUCTION_SUCCESS", 22) == 0) {
+        int aid;
+        sscanf(response, "DELETE_AUCTION_SUCCESS|%d", &aid);
+
+        printf("\n╔════════════════════════════════════════════════════════╗\n");
+        printf("║          ✅ AUCTION DELETED SUCCESSFULLY! ✅          ║\n");
+        printf("╠════════════════════════════════════════════════════════╣\n");
+        printf("║ Auction ID:      #%-5d                              ║\n", aid);
+        printf("║ Status:          Deleted                               ║\n");
+        printf("╚════════════════════════════════════════════════════════╝\n");
+
+    } else if (strncmp(response, "DELETE_AUCTION_FAIL", 19) == 0) {
+        char error[256];
+        sscanf(response, "DELETE_AUCTION_FAIL|%[^\n]", error);
+        printf("\n[ERROR] Delete failed: %s\n", error);
+    } else {
+        printf("\n[ERROR] Invalid response from server!\n");
     }
 
     printf("\nPress Enter to continue...");
@@ -1425,34 +1642,40 @@ int main() {
                     list_auctions();
                     break;
                 case 8:
-                    view_my_auctions();
+                    view_live_auctions();
                     break;
                 case 9:
-                    view_auction_detail();
+                    view_my_auctions();
                     break;
                 case 10:
-                    create_auction();
+                    view_auction_detail();
                     break;
                 case 11:
-                    place_bid();
+                    create_auction();
                     break;
                 case 12:
-                    buy_now();
+                    delete_auction();
                     break;
                 case 13:
-                    view_bid_history();
+                    place_bid();
                     break;
                 case 14:
-                    view_auction_history();
+                    buy_now();
                     break;
                 case 15:
+                    view_bid_history();
+                    break;
+                case 16:
+                    view_auction_history();
+                    break;
+                case 17:
                     // Leave room before logout
                     if (current_room_id > 0) {
                         char request[256];
                         sprintf(request, "LEAVE_ROOM|%d\n", current_user_id);
                         send_request(request);
                     }
-
+                    
                     logged_in = 0;
                     current_user_id = 0;
                     current_room_id = 0;
